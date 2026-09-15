@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lynxos Health - Health Tracker</title>
+<style>
+  :root {
+    --ink: #071a21;
+    --ink-2: #123640;
+    --panel: #0b2730;
+    --paper: #edf4f2;
+    --white: #ffffff;
+    --orange: #ff7849;
+    --mint: #53e3bd;
+    --yellow: #ffd166;
+    --line: #9eb8ba;
+    --muted: #304f58;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--panel);
+    color: var(--paper);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    padding-bottom: 3rem;
+  }
+  header.app-header {
+    background: var(--ink);
+    padding: 1.25rem 1rem 1rem;
+    border-bottom: 3px solid var(--yellow);
+  }
+  header.app-header h1 { margin: 0; color: var(--yellow); font-size: 1.6rem; }
+  header.app-header p { margin: .25rem 0 0; color: var(--line); }
+  header.app-header .header-row {
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap;
+  }
+  main { padding: 1rem; max-width: 44rem; margin: 0 auto; }
+  section.card {
+    background: var(--ink-2);
+    border: 1px solid var(--muted);
+    border-radius: .9rem;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  section.card h2 { margin: 0 0 .5rem; color: var(--yellow); font-size: 1.35rem; }
+  section.card h3 { margin: 1.25rem 0 .5rem; color: var(--mint); font-size: 1.1rem; }
+  .summary { font-weight: 700; margin: .25rem 0 .75rem; }
+  .hint { color: var(--line); font-size: .95rem; margin: .25rem 0 .75rem; }
+  form.log-form {
+    display: grid; gap: .6rem;
+    background: var(--panel);
+    border: 1px solid var(--muted);
+    border-radius: .7rem;
+    padding: .9rem;
+    margin-bottom: .75rem;
+  }
+  form.log-form label { display: grid; gap: .25rem; font-weight: 700; }
+  form.log-form input, form.log-form select, textarea#import-text {
+    min-height: 52px;
+    font-size: 1.1rem;
+    padding: .55rem .7rem;
+    border-radius: .55rem;
+    border: 2px solid var(--line);
+    background: var(--white);
+    color: var(--ink);
+    width: 100%;
+  }
+  form.log-form input:focus, form.log-form select:focus, textarea#import-text:focus {
+    outline: 3px solid var(--yellow);
+    outline-offset: 2px;
+  }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .btn {
+    min-height: 52px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    border-radius: .7rem;
+    border: none;
+    padding: .7rem 1.1rem;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--yellow); color: var(--ink); }
+  .btn-secondary { background: transparent; color: var(--yellow); border: 2px solid var(--yellow); }
+  .btn-danger { background: transparent; color: var(--orange); border: 2px solid var(--orange); min-height: 44px; font-size: 1rem; }
+  .btn:active { transform: scale(.98); }
+  ul.log-list { list-style: none; margin: .5rem 0 0; padding: 0; }
+  ul.log-list li {
+    background: var(--panel);
+    border: 1px solid var(--muted);
+    border-radius: .6rem;
+    padding: .6rem .75rem;
+    margin-bottom: .45rem;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+  }
+  ul.log-list li .entry-text { flex: 1; }
+  ul.log-list li .entry-sub { display: block; font-weight: 400; color: var(--line); font-size: .95rem; }
+  .record-badge {
+    display: inline-block; background: var(--yellow); color: var(--ink);
+    font-weight: 800; font-size: .85rem; border-radius: .4rem; padding: .1rem .5rem; margin-left: .4rem;
+  }
+  canvas.chart {
+    width: 100%; height: 220px;
+    background: var(--panel);
+    border: 1px solid var(--muted);
+    border-radius: .6rem;
+    margin: .5rem 0;
+  }
+  .trend-text { font-weight: 700; color: var(--mint); }
+  details.import-box {
+    background: var(--panel);
+    border: 1px dashed var(--line);
+    border-radius: .7rem;
+    padding: .8rem;
+    margin-bottom: .75rem;
+  }
+  details.import-box summary { font-weight: 800; cursor: pointer; min-height: 44px; }
+  textarea#import-text { min-height: 90px; font-size: .95rem; margin: .5rem 0; font-family: monospace; }
+  .status { min-height: 1.5em; font-weight: 700; color: var(--mint); margin: .4rem 0; }
+  footer.app-footer { text-align: center; color: var(--line); padding: 1rem; font-size: .95rem; }
+  .version-tag { color: var(--line); font-size: .9rem; }
+  [hidden] { display: none !important; }
+  .tab-nav {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: .4rem; overflow-x: auto;
+    background: var(--ink); padding: .6rem .8rem;
+    border-bottom: 2px solid var(--muted);
+  }
+  .tab-nav button {
+    flex: 1 0 auto; min-height: 48px; padding: .5rem .9rem;
+    font-size: 1rem; font-weight: 800; border-radius: .6rem;
+    background: transparent; color: var(--paper);
+    border: 2px solid var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .tab-nav button[aria-selected="true"] {
+    background: var(--yellow); color: var(--ink); border-color: var(--yellow);
+  }
+  .points-wrap { margin: .25rem 0 .75rem; }
+  .points-bar {
+    background: var(--panel); border: 1px solid var(--muted); border-radius: 1rem;
+    height: 28px; overflow: hidden;
+  }
+  .points-fill {
+    background: linear-gradient(90deg, var(--mint), var(--yellow));
+    height: 100%; width: 0%; border-radius: 1rem;
+    transition: width .4s ease;
+  }
+  .points-text { font-weight: 800; margin: .35rem 0 0; color: var(--yellow); }
+</style>
+</head>
+<body id="lynxos-health-app">
+<header class="app-header">
+  <div class="header-row">
+    <div>
+      <h1>Lynxos Health</h1>
+      <p>Your personal health tracker. <span class="version-tag" id="app-version"></span></p>
+    </div>
+    <button class="btn btn-secondary" type="button" id="read-progress">Read my progress aloud</button>
+  </div>
+</header>
+<nav class="tab-nav" role="tablist" aria-label="Tracker sections">
+  <button type="button" role="tab" id="tab-workouts" aria-selected="true" aria-controls="sec-workouts">Workouts</button>
+  <button type="button" role="tab" id="tab-weight" aria-selected="false" aria-controls="sec-weight">Weight</button>
+  <button type="button" role="tab" id="tab-measure" aria-selected="false" aria-controls="sec-measure">Measures</button>
+  <button type="button" role="tab" id="tab-prs" aria-selected="false" aria-controls="sec-prs">Records</button>
+  <button type="button" role="tab" id="tab-data" aria-selected="false" aria-controls="sec-data">Data</button>
+</nav>
+<main>
+  <section class="card" id="sec-workouts" role="tabpanel" aria-labelledby="workouts-title">
+    <h2 id="workouts-title">Workouts</h2>
+    <p class="summary" id="workouts-summary" role="status">No workouts logged yet.</p>
+    <div class="points-wrap">
+      <div class="points-bar" id="points-bar" role="progressbar" aria-label="Activity points this week" aria-valuemin="0" aria-valuemax="150" aria-valuenow="0">
+        <div class="points-fill" id="points-fill"></div>
+      </div>
+      <p class="points-text" id="points-text"></p>
+      <p class="hint">Moderate activity earns 1 point per minute, vigorous earns 2. Aim for 150 points a week, per the American Heart Association.</p>
+    </div>
+    <form class="log-form" id="workout-form">
+      <div class="form-row">
+        <label>Date
+          <input type="date" id="workout-date" required>
+        </label>
+        <label>Duration (minutes)
+          <input type="number" id="workout-duration" inputmode="numeric" min="1" max="600" value="30" required>
+        </label>
+      </div>
+      <label>Workout name
+        <input type="text" id="workout-name" placeholder="Upper body and core" autocomplete="off" required>
+      </label>
+      <div class="form-row">
+        <label>Exercises completed
+          <input type="number" id="workout-exercises" inputmode="numeric" min="1" max="200" value="8" required>
+        </label>
+        <label>Intensity
+          <select id="workout-intensity">
+            <option value="moderate" selected>Moderate (1 pt/min)</option>
+            <option value="vigorous">Vigorous (2 pts/min)</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Log workout</button>
+    </form>
+    <p class="status" id="workout-status" role="status" aria-live="polite"></p>
+    <details class="import-box">
+      <summary>Import from Lynxos Gym</summary>
+      <p class="hint">In Lynxos Gym, open Profile, then Workout History, then "Copy history for Lynxos Health". Paste the copied text here and import.</p>
+      <label for="import-text" style="font-weight:700;">Pasted Lynxos Gym data</label>
+      <textarea id="import-text" placeholder="Paste the copied text here"></textarea>
+      <button class="btn btn-secondary" type="button" id="import-btn">Import workouts</button>
+      <p class="status" id="import-status" role="status" aria-live="polite"></p>
+    </details>
+    <ul class="log-list" id="workout-list"></ul>
+  </section>
+
+  <section class="card" id="sec-weight" role="tabpanel" aria-labelledby="weight-title" hidden>
+    <h2 id="weight-title">Body weight</h2>
+    <p class="summary" id="weight-summary" role="status">No weight entries yet.</p>
+    <canvas class="chart" id="weight-chart" role="img" aria-label="Body weight chart. A text summary follows the chart."></canvas>
+    <p class="trend-text" id="weight-trend"></p>
+    <form class="log-form" id="weight-form">
+      <div class="form-row">
+        <label>Date
+          <input type="date" id="weight-date" required>
+        </label>
+        <label>Weight (lb)
+          <input type="number" id="weight-value" inputmode="decimal" min="1" max="1500" step="0.1" placeholder="185" required>
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Log weight</button>
+    </form>
+    <p class="status" id="weight-status" role="status" aria-live="polite"></p>
+    <ul class="log-list" id="weight-list"></ul>
+  </section>
+
+  <section class="card" id="sec-measure" role="tabpanel" aria-labelledby="measure-title" hidden>
+    <h2 id="measure-title">Measurements</h2>
+    <p class="hint">Track in inches. Fill in whichever ones you measure; leave the rest blank.</p>
+    <p class="summary" id="measure-summary" role="status">No measurements logged yet.</p>
+    <form class="log-form" id="measure-form">
+      <label>Date
+        <input type="date" id="measure-date" required>
+      </label>
+      <div class="form-row">
+        <label>Waist (in)
+          <input type="number" id="measure-waist" inputmode="decimal" min="1" max="200" step="0.25" placeholder="Optional">
+        </label>
+        <label>Chest (in)
+          <input type="number" id="measure-chest" inputmode="decimal" min="1" max="200" step="0.25" placeholder="Optional">
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Arm (in)
+          <input type="number" id="measure-arm" inputmode="decimal" min="1" max="100" step="0.25" placeholder="Optional">
+        </label>
+        <label>Thigh (in)
+          <input type="number" id="measure-thigh" inputmode="decimal" min="1" max="200" step="0.25" placeholder="Optional">
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Log measurements</button>
+    </form>
+    <p class="status" id="measure-status" role="status" aria-live="polite"></p>
+    <ul class="log-list" id="measure-list"></ul>
+  </section>
+
+  <section class="card" id="sec-prs" role="tabpanel" aria-labelledby="pr-title" hidden>
+    <h2 id="pr-title">Personal records</h2>
+    <p class="hint">Log a lift and the app keeps your best for each exercise.</p>
+    <p class="summary" id="pr-summary" role="status">No personal records yet.</p>
+    <form class="log-form" id="pr-form">
+      <label>Exercise
+        <input type="text" id="pr-exercise" list="exercise-names" placeholder="Goblet squat" autocomplete="off" required>
+        <datalist id="exercise-names"></datalist>
+      </label>
+      <div class="form-row">
+        <label>Weight (lb)
+          <input type="number" id="pr-weight" inputmode="decimal" min="1" max="2000" step="1" placeholder="25" required>
+        </label>
+        <label>Reps
+          <input type="number" id="pr-reps" inputmode="numeric" min="1" max="500" value="10" required>
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Log lift</button>
+    </form>
+    <p class="status" id="pr-status" role="status" aria-live="polite"></p>
+    <h3>Your best lifts</h3>
+    <ul class="log-list" id="pr-list"></ul>
+  </section>
+
+  <section class="card" id="sec-data" role="tabpanel" aria-labelledby="data-title" hidden>
+    <h2 id="data-title">My data</h2>
+    <p class="hint">Everything is stored on this phone only. Copy a backup before erasing, or to move it to another phone.</p>
+    <div style="display:grid; gap:.6rem;">
+      <button class="btn btn-secondary" type="button" id="export-data">Copy all my data</button>
+      <button class="btn btn-danger" type="button" id="erase-data">Erase all my data</button>
+    </div>
+    <p class="status" id="data-status" role="status" aria-live="polite"></p>
+  </section>
+</main>
+<footer class="app-footer">
+  Consistency beats a perfect workout. All data stays on your phone.
+</footer>
+<script>
+"use strict";
+const APP_VERSION = "1.2";
+const STORE_KEY = "lynxosHealth.v1";
+const POINTS_GOAL = 150;
+
+const EXERCISE_NAMES = [
+  "Ab roller plank hold", "Band anti-rotation press", "Banded squat", "Barbell bent-over row",
+  "Barbell deadlift", "Basic jump-rope bounce", "Bench incline push-up", "Bench plank",
+  "Bench sit-to-stand", "Bent-over dumbbell row", "Bird dog", "Bodyweight glute bridge",
+  "Bodyweight squat", "Dead bug", "Diagonal ab rollout", "Dumbbell Romanian deadlift",
+  "Dumbbell floor press", "Dumbbell reverse lunge", "Dumbbell suitcase march", "EZ-bar curl",
+  "Glute bridge", "Goblet squat", "Half-kneeling kettlebell press", "Kettlebell deadlift",
+  "Kneeling ab rollout", "Kneeling push-up", "Kneeling shoulder tap", "Lat pulldown",
+  "Low step-up", "Machine leg press", "Plate front raise", "Plate front squat",
+  "Prone Y raise", "Rack-supported squat", "Rowing machine", "Sandbag bear-hug squat",
+  "Scapular pull-up", "Seated band row", "Seated cable row", "Smith machine squat"
+];
+
+/* ---------- storage ---------- */
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      return {
+        workouts: Array.isArray(d.workouts) ? d.workouts : [],
+        weights: Array.isArray(d.weights) ? d.weights : [],
+        measures: Array.isArray(d.measures) ? d.measures : [],
+        prs: Array.isArray(d.prs) ? d.prs : []
+      };
+    }
+  } catch (e) {}
+  return { workouts: [], weights: [], measures: [], prs: [] };
+}
+let S = loadState();
+function saveState() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {}
+}
+
+/* ---------- helpers ---------- */
+function $(id) { return document.getElementById(id); }
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+function todayInputValue() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return d.getFullYear() + "-" + m + "-" + day;
+}
+function parseInputDate(value) {
+  const parts = String(value || "").split("-");
+  if (parts.length !== 3) return null;
+  const t = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 12, 0, 0).getTime();
+  return isNaN(t) ? null : t;
+}
+function fmtDate(ts) {
+  try {
+    return new Date(ts).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  } catch (e) { return ""; }
+}
+function fmtDateShort(ts) {
+  try {
+    return new Date(ts).toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+  } catch (e) { return ""; }
+}
+function speak(text) {
+  try {
+    const b = window.LynxosTts;
+    if (b && typeof b.speak === "function") { b.speak(text); return; }
+  } catch (e) {}
+  try {
+    speechSynthesis.cancel();
+    speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  } catch (e) {}
+}
+function setStatus(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text;
+}
+function num(value, min, max) {
+  const n = Number(value);
+  if (!isFinite(n) || n < min || n > max) return null;
+  return n;
+}
+
+/* ---------- workouts ---------- */
+function addWorkout(entry) {
+  S.workouts.push({
+    date: entry.date, name: String(entry.name || "Workout").slice(0, 80),
+    durationMin: entry.durationMin, exercises: entry.exercises,
+    intensity: entry.intensity === "vigorous" ? "vigorous" : "moderate",
+    source: entry.source || "manual"
+  });
+  S.workouts.sort((a, b) => b.date - a.date);
+  if (S.workouts.length > 500) S.workouts.length = 500;
+  saveState();
+}
+function workoutPoints(w) {
+  return Math.max(0, Number(w.durationMin) || 0) * (w.intensity === "vigorous" ? 2 : 1);
+}
+function weekStartMs() {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(now.getDate() - now.getDay());
+  return start.getTime();
+}
+function weeklyPoints() {
+  const t = weekStartMs();
+  return S.workouts.filter(w => w.date >= t).reduce((sum, w) => sum + workoutPoints(w), 0);
+}
+function weeklyWorkoutCount() {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(now.getDate() - now.getDay());
+  const t = start.getTime();
+  return S.workouts.filter(w => w.date >= t).length;
+}
+function deleteWorkout(index) {
+  const sorted = S.workouts.slice().sort((a, b) => b.date - a.date);
+  const target = sorted[index];
+  if (!target) return;
+  const i = S.workouts.indexOf(target);
+  if (i >= 0) S.workouts.splice(i, 1);
+  saveState();
+  renderWorkouts();
+}
+function renderWorkouts() {
+  const list = $("workout-list");
+  const week = weeklyWorkoutCount();
+  $("workouts-summary").textContent = S.workouts.length
+    ? "This week: " + week + " workouts. Total logged: " + S.workouts.length + "."
+    : "No workouts logged yet.";
+  const pts = weeklyPoints();
+  const pct = Math.min(100, Math.round(pts / POINTS_GOAL * 100));
+  const bar = $("points-bar"), fill = $("points-fill"), ptext = $("points-text");
+  if (bar) bar.setAttribute("aria-valuenow", String(Math.min(pts, POINTS_GOAL)));
+  if (fill) fill.style.width = pct + "%";
+  if (ptext) ptext.textContent = pts >= POINTS_GOAL
+    ? "Weekly goal reached: " + pts + " of " + POINTS_GOAL + " activity points. Nice work."
+    : pts + " of " + POINTS_GOAL + " activity points this week.";
+  if (!S.workouts.length) {
+    list.innerHTML = "<li><span class='entry-text'>Nothing here yet. Log your first workout above.</span></li>";
+    return;
+  }
+  list.innerHTML = S.workouts.map((w, i) => {
+    const label = escapeHtml(w.name) + " — " + w.durationMin + " min, " + w.exercises + " exercises, " + workoutPoints(w) + " pts";
+    const sub = fmtDate(w.date) + " · " + (w.intensity === "vigorous" ? "Vigorous" : "Moderate") + (w.source === "lynxos-gym" ? " · from Lynxos Gym" : "");
+    return "<li><span class='entry-text'>" + label +
+      "<span class='entry-sub'>" + sub + "</span></span>" +
+      "<button class='btn btn-danger' type='button' data-del-workout='" + i + "' aria-label='Delete workout " + escapeHtml(w.name) + " on " + fmtDate(w.date) + "'>Delete</button></li>";
+  }).join("");
+  list.querySelectorAll("[data-del-workout]").forEach(btn => btn.addEventListener("click", () => {
+    deleteWorkout(Number(btn.getAttribute("data-del-workout")));
+  }));
+}
+function parseGymImport(text) {
+  let data;
+  try { data = JSON.parse(text); }
+  catch (e) { return { error: "That text is not valid copied data. Copy again from Lynxos Gym and try once more." }; }
+  const raw = Array.isArray(data) ? data : data.workouts;
+  if (!Array.isArray(raw) || !raw.length) return { error: "No workouts found in that text." };
+  const workouts = [];
+  raw.forEach(r => {
+    const date = Number(r.date);
+    if (!date || isNaN(date)) return;
+    workouts.push({
+      date: date,
+      name: String(r.title || r.name || "Lynxos Gym workout").slice(0, 80),
+      durationMin: Math.max(1, Math.round(Number(r.durationSec || r.durationMin || 30) / (r.durationSec ? 60 : 1))),
+      exercises: Math.max(1, Number(r.exercises) || 1),
+      intensity: "moderate",
+      source: "lynxos-gym"
+    });
+  });
+  if (!workouts.length) return { error: "No usable workouts found in that text." };
+  return { workouts: workouts };
+}
+function importGymWorkouts(workouts) {
+  let added = 0;
+  workouts.forEach(w => {
+    const dup = S.workouts.some(x => x.date === w.date && x.name === w.name);
+    if (!dup) { S.workouts.push(w); added++; }
+  });
+  S.workouts.sort((a, b) => b.date - a.date);
+  if (S.workouts.length > 500) S.workouts.length = 500;
+  saveState();
+  renderWorkouts();
+  return added;
+}
+
+/* ---------- body weight ---------- */
+function addWeight(entry) {
+  S.weights.push({ date: entry.date, weight: entry.weight });
+  S.weights.sort((a, b) => a.date - b.date);
+  if (S.weights.length > 500) S.weights = S.weights.slice(-500);
+  saveState();
+}
+function deleteWeight(index) {
+  const sorted = S.weights.slice().sort((a, b) => b.date - a.date);
+  const target = sorted[index];
+  if (!target) return;
+  const i = S.weights.indexOf(target);
+  if (i >= 0) S.weights.splice(i, 1);
+  saveState();
+  renderWeights();
+}
+function weightTrend() {
+  if (!S.weights.length) return null;
+  const asc = S.weights.slice().sort((a, b) => a.date - b.date);
+  const first = asc[0], latest = asc[asc.length - 1];
+  const delta = latest.weight - first.weight;
+  const days = Math.max(1, Math.round((latest.date - first.date) / 86400000));
+  return { latest: latest, first: first, delta: delta, days: days };
+}
+function weightTrendText() {
+  const t = weightTrend();
+  if (!t) return "";
+  let s = "Latest: " + t.latest.weight + " pounds on " + fmtDate(t.latest.date) + ". ";
+  if (S.weights.length < 2) return s + "Log another weigh-in to see your trend.";
+  const amt = Math.abs(Math.round(t.delta * 10) / 10);
+  if (amt < 0.05) return s + "Holding steady since " + fmtDate(t.first.date) + ".";
+  const dir = t.delta < 0 ? "Down" : "Up";
+  return s + dir + " " + amt + " pounds since " + fmtDate(t.first.date) + " (" + t.days + " days).";
+}
+function renderWeights() {
+  const list = $("weight-list");
+  const t = weightTrend();
+  $("weight-summary").textContent = t
+    ? "Latest: " + t.latest.weight + " lb on " + fmtDate(t.latest.date) + ". " + S.weights.length + " entries."
+    : "No weight entries yet.";
+  $("weight-trend").textContent = weightTrendText();
+  drawWeightChart();
+  if (!S.weights.length) {
+    list.innerHTML = "<li><span class='entry-text'>Nothing here yet.</span></li>";
+    return;
+  }
+  const desc = S.weights.slice().sort((a, b) => b.date - a.date);
+  list.innerHTML = desc.map((w, i) =>
+    "<li><span class='entry-text'>" + w.weight + " lb" +
+    "<span class='entry-sub'>" + fmtDate(w.date) + "</span></span>" +
+    "<button class='btn btn-danger' type='button' data-del-weight='" + i + "' aria-label='Delete weight entry " + w.weight + " pounds on " + fmtDate(w.date) + "'>Delete</button></li>"
+  ).join("");
+  list.querySelectorAll("[data-del-weight]").forEach(btn => btn.addEventListener("click", () => {
+    deleteWeight(Number(btn.getAttribute("data-del-weight")));
+  }));
+}
+function drawWeightChart() {
+  const canvas = $("weight-chart");
+  const entries = S.weights.slice().sort((a, b) => a.date - b.date);
+  const label = weightTrendText() || "No weight data yet.";
+  canvas.setAttribute("aria-label", "Body weight chart. " + label);
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth || 300, H = 220;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#ffd166";
+  ctx.font = "13px system-ui, sans-serif";
+  if (!entries.length) {
+    ctx.fillText("Log your weight to see your chart.", 16, H / 2);
+    return;
+  }
+  const padL = 44, padR = 12, padT = 16, padB = 28;
+  const weights = entries.map(e => e.weight);
+  let lo = Math.min.apply(null, weights), hi = Math.max.apply(null, weights);
+  if (hi - lo < 2) { lo -= 1; hi += 1; }
+  const x = i => padL + (entries.length === 1 ? (W - padL - padR) / 2 : i * (W - padL - padR) / (entries.length - 1));
+  const y = v => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  ctx.strokeStyle = "#9eb8ba";
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, H - padB); ctx.lineTo(W - padR, H - padB); ctx.stroke();
+  ctx.fillStyle = "#9eb8ba";
+  ctx.fillText(Math.round(hi) + "", 6, padT + 12);
+  ctx.fillText(Math.round(lo) + "", 6, H - padB);
+  ctx.fillText(fmtDateShort(entries[0].date), padL, H - 8);
+  if (entries.length > 1) {
+    const last = fmtDateShort(entries[entries.length - 1].date);
+    ctx.fillText(last, W - padR - ctx.measureText(last).width, H - 8);
+  }
+  if (entries.length === 1) {
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath(); ctx.arc(x(0), y(weights[0]), 5, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
+  ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 3;
+  ctx.beginPath();
+  entries.forEach((e, i) => { i ? ctx.lineTo(x(i), y(e.weight)) : ctx.moveTo(x(i), y(e.weight)); });
+  ctx.stroke();
+  ctx.fillStyle = "#ffd166";
+  entries.forEach((e, i) => { ctx.beginPath(); ctx.arc(x(i), y(e.weight), 4, 0, Math.PI * 2); ctx.fill(); });
+}
+
+/* ---------- measurements ---------- */
+const MEASURE_FIELDS = [
+  ["waist", "Waist"], ["chest", "Chest"], ["arm", "Arm"], ["thigh", "Thigh"]
+];
+function addMeasures(entry) {
+  const rec = { date: entry.date };
+  MEASURE_FIELDS.forEach(([key]) => { rec[key] = entry[key] != null ? entry[key] : null; });
+  S.measures.push(rec);
+  S.measures.sort((a, b) => a.date - b.date);
+  if (S.measures.length > 500) S.measures = S.measures.slice(-500);
+  saveState();
+}
+function deleteMeasure(index) {
+  const sorted = S.measures.slice().sort((a, b) => b.date - a.date);
+  const target = sorted[index];
+  if (!target) return;
+  const i = S.measures.indexOf(target);
+  if (i >= 0) S.measures.splice(i, 1);
+  saveState();
+  renderMeasures();
+}
+function measureSummaryText() {
+  if (!S.measures.length) return "No measurements logged yet.";
+  const asc = S.measures.slice().sort((a, b) => a.date - b.date);
+  const latest = asc[asc.length - 1], first = asc[0];
+  const parts = [];
+  MEASURE_FIELDS.forEach(([key, label]) => {
+    if (latest[key] == null) return;
+    let s = label + " " + latest[key] + " in";
+    if (first !== latest && first[key] != null) {
+      const d = Math.round((latest[key] - first[key]) * 4) / 4;
+      if (d !== 0) s += " (" + (d > 0 ? "+" : "") + d + " since " + fmtDateShort(first.date) + ")";
+    }
+    parts.push(s);
+  });
+  return "Latest on " + fmtDate(latest.date) + ": " + (parts.join(", ") || "no values") + ".";
+}
+function renderMeasures() {
+  const list = $("measure-list");
+  $("measure-summary").textContent = measureSummaryText();
+  if (!S.measures.length) {
+    list.innerHTML = "<li><span class='entry-text'>Nothing here yet.</span></li>";
+    return;
+  }
+  const desc = S.measures.slice().sort((a, b) => b.date - a.date);
+  list.innerHTML = desc.map((m, i) => {
+    const parts = [];
+    MEASURE_FIELDS.forEach(([key, label]) => {
+      if (m[key] != null) parts.push(label + " " + m[key] + " in");
+    });
+    return "<li><span class='entry-text'>" + escapeHtml(parts.join(" · ") || "No values") +
+      "<span class='entry-sub'>" + fmtDate(m.date) + "</span></span>" +
+      "<button class='btn btn-danger' type='button' data-del-measure='" + i + "' aria-label='Delete measurements on " + fmtDate(m.date) + "'>Delete</button></li>";
+  }).join("");
+  list.querySelectorAll("[data-del-measure]").forEach(btn => btn.addEventListener("click", () => {
+    deleteMeasure(Number(btn.getAttribute("data-del-measure")));
+  }));
+}
+
+/* ---------- personal records ---------- */
+function bestLifts() {
+  const best = {};
+  S.prs.forEach(p => {
+    const key = String(p.exercise).toLowerCase();
+    const cur = best[key];
+    if (!cur || p.weight > cur.weight || (p.weight === cur.weight && p.reps > cur.reps)) {
+      best[key] = p;
+    }
+  });
+  return Object.keys(best).map(k => best[k]).sort((a, b) =>
+    String(a.exercise).localeCompare(String(b.exercise)));
+}
+function logPR(entry) {
+  const key = String(entry.exercise).toLowerCase();
+  const prev = bestLifts().find(b => String(b.exercise).toLowerCase() === key);
+  const isRecord = !prev || entry.weight > prev.weight ||
+    (entry.weight === prev.weight && entry.reps > prev.reps);
+  S.prs.push({
+    date: entry.date, exercise: String(entry.exercise).slice(0, 60),
+    weight: entry.weight, reps: entry.reps
+  });
+  if (S.prs.length > 500) S.prs = S.prs.slice(-500);
+  saveState();
+  return isRecord;
+}
+function renderPRs() {
+  const list = $("pr-list");
+  const bests = bestLifts();
+  $("pr-summary").textContent = bests.length
+    ? bests.length + " exercises with personal records."
+    : "No personal records yet.";
+  if (!bests.length) {
+    list.innerHTML = "<li><span class='entry-text'>Log a lift above and your best will show here.</span></li>";
+    return;
+  }
+  list.innerHTML = bests.map(b =>
+    "<li><span class='entry-text'>" + escapeHtml(b.exercise) +
+    "<span class='entry-sub'>" + b.weight + " lb × " + b.reps + " reps · " + fmtDate(b.date) + "</span></span>" +
+    "<span class='record-badge'>PR</span></li>"
+  ).join("");
+}
+
+/* ---------- progress readout ---------- */
+function progressSummary() {
+  const parts = [];
+  const week = weeklyWorkoutCount();
+  const pts = weeklyPoints();
+  parts.push(S.workouts.length
+    ? "Workouts this week: " + week + ", earning " + pts + " of " + POINTS_GOAL + " activity points."
+    : "No workouts logged yet.");
+  const t = weightTrend();
+  parts.push(t ? weightTrendText() : "No weight entries yet.");
+  const bests = bestLifts();
+  parts.push(bests.length
+    ? "Personal records in " + bests.length + " exercises."
+    : "No personal records yet.");
+  parts.push(S.measures.length
+    ? measureSummaryText()
+    : "No measurements logged yet.");
+  return parts.join(" ");
+}
+
+/* ---------- forms ---------- */
+function wireForms() {
+  $("workout-date").value = todayInputValue();
+  $("weight-date").value = todayInputValue();
+  $("measure-date").value = todayInputValue();
+
+  $("workout-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const date = parseInputDate($("workout-date").value);
+    const name = $("workout-name").value.trim();
+    const durationMin = num($("workout-duration").value, 1, 600);
+    const exercises = num($("workout-exercises").value, 1, 200);
+    const intensity = $("workout-intensity").value === "vigorous" ? "vigorous" : "moderate";
+    if (!date || !name || !durationMin || !exercises) {
+      setStatus("workout-status", "Fill in every field to log the workout.");
+      return;
+    }
+    addWorkout({ date: date, name: name, durationMin: durationMin, exercises: exercises, intensity: intensity, source: "manual" });
+    $("workout-name").value = "";
+    setStatus("workout-status", "Logged: " + name + ", " + durationMin + " minutes (" + (durationMin * (intensity === "vigorous" ? 2 : 1)) + " points).");
+    renderWorkouts();
+  });
+
+  $("import-btn").addEventListener("click", () => {
+    const text = $("import-text").value.trim();
+    if (!text) { setStatus("import-status", "Paste the copied text first."); return; }
+    const res = parseGymImport(text);
+    if (res.error) { setStatus("import-status", res.error); return; }
+    const added = importGymWorkouts(res.workouts);
+    $("import-text").value = "";
+    setStatus("import-status", added
+      ? "Imported " + added + " workouts from Lynxos Gym."
+      : "Those workouts are already in your log. Nothing new added.");
+  });
+
+  $("weight-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const date = parseInputDate($("weight-date").value);
+    const weight = num($("weight-value").value, 1, 1500);
+    if (!date || !weight) {
+      setStatus("weight-status", "Enter a date and your weight.");
+      return;
+    }
+    addWeight({ date: date, weight: Math.round(weight * 10) / 10 });
+    $("weight-value").value = "";
+    setStatus("weight-status", "Logged: " + weight + " pounds on " + fmtDate(date) + ".");
+    renderWeights();
+  });
+
+  $("measure-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const date = parseInputDate($("measure-date").value);
+    if (!date) { setStatus("measure-status", "Pick a date first."); return; }
+    const entry = { date: date };
+    let any = false;
+    MEASURE_FIELDS.forEach(([key]) => {
+      const v = $("measure-" + key).value.trim();
+      if (v === "") { entry[key] = null; return; }
+      const n = num(v, 1, 300);
+      if (n == null) { entry[key] = "bad"; return; }
+      entry[key] = Math.round(n * 4) / 4;
+      any = true;
+    });
+    if (Object.keys(entry).some(k => entry[k] === "bad")) {
+      setStatus("measure-status", "Check your numbers; something is out of range.");
+      return;
+    }
+    if (!any) { setStatus("measure-status", "Enter at least one measurement."); return; }
+    addMeasures(entry);
+    MEASURE_FIELDS.forEach(([key]) => { $("measure-" + key).value = ""; });
+    setStatus("measure-status", "Measurements logged for " + fmtDate(date) + ".");
+    renderMeasures();
+  });
+
+  $("pr-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const exercise = $("pr-exercise").value.trim();
+    const weight = num($("pr-weight").value, 1, 2000);
+    const reps = num($("pr-reps").value, 1, 500);
+    if (!exercise || !weight || !reps) {
+      setStatus("pr-status", "Enter the exercise, weight, and reps.");
+      return;
+    }
+    const isRecord = logPR({ date: Date.now(), exercise: exercise, weight: weight, reps: reps });
+    $("pr-exercise").value = "";
+    setStatus("pr-status", isRecord
+      ? "New personal record! " + exercise + ": " + weight + " pounds for " + reps + " reps."
+      : "Logged " + exercise + ": " + weight + " pounds for " + reps + " reps.");
+    if (isRecord) speak("New personal record! " + exercise + ", " + weight + " pounds for " + reps + " reps.");
+    renderPRs();
+  });
+
+  $("export-data").addEventListener("click", () => {
+    const payload = JSON.stringify({ app: "lynxos-health", exportedAt: Date.now(), data: S });
+    const done = () => setStatus("data-status", "Copied. Paste it somewhere safe as your backup.");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(payload).then(done, () => setStatus("data-status", "Copy failed; your browser blocked it."));
+      } else {
+        setStatus("data-status", "Copy is not available in this browser.");
+      }
+    } catch (e) { setStatus("data-status", "Copy is not available in this browser."); }
+  });
+
+  $("erase-data").addEventListener("click", () => {
+    if (!confirm("Erase ALL Lynxos Health data on this phone? This cannot be undone.")) return;
+    S = { workouts: [], weights: [], measures: [], prs: [] };
+    saveState();
+    renderAll();
+    setStatus("data-status", "All data erased.");
+  });
+
+  $("read-progress").addEventListener("click", () => speak(progressSummary()));
+
+  const dl = $("exercise-names");
+  EXERCISE_NAMES.forEach(n => {
+    const o = document.createElement("option");
+    o.value = n;
+    dl.appendChild(o);
+  });
+}
+
+function renderAll() {
+  renderWorkouts();
+  renderWeights();
+  renderMeasures();
+  renderPRs();
+}
+
+/* ---------- tabs ---------- */
+const TABS = [
+  ["tab-workouts", "sec-workouts"],
+  ["tab-weight", "sec-weight"],
+  ["tab-measure", "sec-measure"],
+  ["tab-prs", "sec-prs"],
+  ["tab-data", "sec-data"]
+];
+const TAB_STORE_KEY = STORE_KEY + ".tab";
+function showTab(secId, moveFocus) {
+  TABS.forEach(([tabId, sId]) => {
+    const on = sId === secId;
+    const tab = $(tabId), sec = $(sId);
+    if (tab) tab.setAttribute("aria-selected", on ? "true" : "false");
+    if (sec) sec.hidden = !on;
+  });
+  try { localStorage.setItem(TAB_STORE_KEY, secId); } catch (e) {}
+  try { window.scrollTo(0, 0); } catch (e) {}
+  if (moveFocus) {
+    const h = document.querySelector("#" + secId + " h2");
+    if (h) {
+      h.setAttribute("tabindex", "-1");
+      h.focus({ preventScroll: true });
+    }
+  }
+}
+function wireTabs() {
+  TABS.forEach(([tabId, secId]) => {
+    const tab = $(tabId);
+    if (tab) tab.addEventListener("click", () => showTab(secId, true));
+  });
+}
+function restoreTab() {
+  let saved = null;
+  try { saved = localStorage.getItem(TAB_STORE_KEY); } catch (e) {}
+  const known = TABS.some(([, sId]) => sId === saved);
+  showTab(known ? saved : "sec-workouts", false);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  $("app-version").textContent = "v" + APP_VERSION;
+  wireForms();
+  wireTabs();
+  renderAll();
+  restoreTab();
+  window.addEventListener("resize", drawWeightChart);
+});
+</script>
+</body>
+</html>
