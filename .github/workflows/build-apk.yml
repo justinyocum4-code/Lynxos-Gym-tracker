@@ -4,10 +4,32 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name (e.g. 1.2)'
+        required: false
+        type: string
+        default: ''
+      version_code:
+        description: 'Version code - must be a whole number bigger than last time'
+        required: false
+        type: string
+        default: ''
+      release_notes:
+        description: 'What changed in this version (shown in the store)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   build:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
+    env:
+      APP_VERSION_NAME: ${{ inputs.version_name || '1.2' }}
+      APP_VERSION_CODE: ${{ inputs.version_code || '1' }}
+      APP_RELEASE_NOTES: ${{ inputs.release_notes || 'Update' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -85,11 +107,12 @@ jobs:
                   applicationId 'com.lynxoshealth.app'
                   minSdk 24
                   targetSdk 34
-                  versionCode 1
-                  versionName '1.2'
+                  versionCode __APP_VERSION_CODE__
+                  versionName '__APP_VERSION_NAME__'
               }
           }
           EOF
+          sed -i "s/__APP_VERSION_CODE__/$APP_VERSION_CODE/g; s/__APP_VERSION_NAME__/$APP_VERSION_NAME/g" app/build.gradle
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -247,12 +270,34 @@ jobs:
         with:
           gradle-version: 8.7
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug
+      - name: Build release APK (unsigned)
+        run: gradle :app:assembleRelease
+
+      - name: Sign release APK with the Lynxos key
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/lynxos-release.p12
+          "$APKSIGNER" sign --ks /tmp/lynxos-release.p12 --ks-type PKCS12 \
+            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --out app/build/outputs/apk/release/app-release.apk \
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          rm -f /tmp/lynxos-release.p12
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: lynxos-health-app-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk
 
+      - name: Publish GitHub release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.APP_VERSION_NAME }}+${{ env.APP_VERSION_CODE }}
+          name: v${{ env.APP_VERSION_NAME }}+${{ env.APP_VERSION_CODE }}
+          body: ${{ env.APP_RELEASE_NOTES }}
+          files: app/build/outputs/apk/release/app-release.apk
